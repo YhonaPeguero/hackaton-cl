@@ -1,0 +1,15 @@
+{
+  "name": "hackaton-cl",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "dev:backend": "cd backend && npm run dev",
+    "scrape": "cd backend && npm run scrape"
+  }
+}
