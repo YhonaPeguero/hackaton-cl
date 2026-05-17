@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import mapboxgl from 'mapbox-gl';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { searchComuna, getComunaDetail } from './api/comunas';
 import DataPanel from './components/DataPanel';
 import VideoModal from './components/VideoModal';
 import './styles/global.css';
 
-// Mapbox token — set VITE_MAPBOX_TOKEN in .env
-// Get one at https://account.mapbox.com/access-tokens/
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
-
-mapboxgl.accessToken = MAPBOX_TOKEN;
+// MapLibre + OpenFreeMap — no API key required
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
 const COMUNA_COORDINATES = {
   'Santiago': [-70.6693, -33.4489],
@@ -41,9 +39,9 @@ export default function App() {
   useEffect(() => {
     if (map.current) return;
 
-    map.current = new mapboxgl.Map({
+    map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
+      style: MAP_STYLE,
       center: [-71.5, -33.5],
       zoom: 5,
       pitch: 45,
@@ -53,7 +51,24 @@ export default function App() {
 
     map.current.on('load', () => {
       setMapLoaded(true);
-      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      // Add 3D buildings layer if available in style
+      if (map.current.getSource('openmaptiles')) {
+        map.current.addLayer({
+          id: 'buildings-3d',
+          source: 'openmaptiles',
+          'source-layer': 'building',
+          type: 'fill-extrusion',
+          minzoom: 14,
+          paint: {
+            'fill-extrusion-color': '#cccccc',
+            'fill-extrusion-height': ['get', 'render_height'],
+            'fill-extrusion-base': ['get', 'render_min_height'],
+            'fill-extrusion-opacity': 0.55,
+          },
+        });
+      }
     });
 
     return () => map.current?.remove();
@@ -84,7 +99,7 @@ export default function App() {
       cursor: pointer;
     `;
 
-    markerRef.current = new mapboxgl.Marker(el)
+    markerRef.current = new maplibregl.Marker(el)
       .setLngLat(coords)
       .addTo(map.current);
   };
@@ -137,7 +152,6 @@ export default function App() {
     if (videoSrc) {
       setVideoUrl(videoSrc);
     } else {
-      // Fallback: trigger backend generation
       setVideoUrl(null);
     }
     setShowVideo(true);
