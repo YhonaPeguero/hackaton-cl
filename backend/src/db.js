@@ -59,3 +59,61 @@ export function initializeDatabase() {
 
   console.log('Database initialized');
 }
+
+/**
+ * Load findings from CSV into the database.
+ * Maps findings to comunas via the nombre field.
+ */
+export function loadHallazgosFromCSV(database, csvPath) {
+  const fs = require('fs');
+  const lines = fs.readFileSync(csvPath, 'utf-8').split('\n').slice(1); // Skip header
+  
+  const insert = database.prepare(`
+    INSERT INTO hallazgos_contraloria 
+      (comuna_nombre, anno, tipo_hallazgo, descripcion, monto_asociado, fuente_url)
+    VALUES 
+      (@comuna_nombre, @anno, @tipo_hallazgo, @descripcion, @monto_asociado, @fuente_url)
+  `);
+
+  let loaded = 0;
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const [comuna_nombre, anno, tipo_hallazgo, descripcion, monto_asociado, fuente_url] = line.split(',');
+    const cleanedDesc = descripcion.replace(/^"|"$/g, '').replace(/""/g, '"');
+    insert.run({
+      comuna_nombre,
+      anno: parseInt(anno),
+      tipo_hallazgo,
+      descripcion: cleanedDesc,
+      monto_asociado: parseFloat(monto_asociado),
+      fuente_url
+    });
+    loaded++;
+  }
+  console.log(`Loaded ${loaded} findings from CSV`);
+}
+
+/**
+ * Get findings linked to a specific comune
+ */
+export function getHallazgosPorComuna(database, comunaNombre) {
+  return database.prepare(`
+    SELECT * FROM hallazgos_contraloria 
+    WHERE comuna_nombre = ?
+    ORDER BY anno DESC
+  `).all(comunaNombre);
+}
+
+/**
+ * Update comunas.observaciones_contraloria based on actual findings count
+ */
+export function syncObservacionesContraloria(database) {
+  database.exec(`
+    UPDATE comunas
+    SET observaciones_contraloria = (
+      SELECT COUNT(*) FROM hallazgos_contraloria hc
+      WHERE hc.comuna_nombre = comunas.nombre
+    )
+  `);
+  console.log('Synced observaciones_contraloria count');
+}
