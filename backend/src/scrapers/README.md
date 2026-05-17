@@ -1,76 +1,55 @@
-# Contraloria General de la República - Scraper
+# SINIM Scraper
 
-Módulo de scraping para extraer hallazgos de auditoría (informes de auditoría) de la Contraloria General de la República de Chile.
+SINIM (Sistema de Información Municipal) data ingestion pipeline for the hackaton-cl project.
 
-## Descripción
+## Overview
 
-Este scraper obtiene datos públicos de informes de auditoría realizados a municipalidades chilenas, clasificando los hallazgos en diferentes categorías según la normativa de la CGR.
+This scraper fetches municipal data from SUBDERE's SINIM system for all 345 Chilean communes. Data includes:
 
-## Hallazgos (Findings)
+- Budget execution (presupuesto_total)
+- Education spending (gasto_educacion)
+- Health spending (gasto_salud)
+- Infrastructure spending (gasto_infraestructura)
+- Green areas m² (m2_areas_verdes)
+- Plazas m² (m2_plazas)
+- Number of parks (numero_parques)
+- Total enrollment (matricula_total)
+- SIMCE math scores (promedio_simce_matematica)
+- SIMCE language scores (promedio_simce_lenguaje)
+- Contraloria observations (observaciones_contraloria)
 
-Los hallazgos representan observaciones realizadas por la Contraloria en sus auditorías a municipalidades. Cada hallazgo incluye:
+## Files
 
-- **comuna_nombre**: Nombre de la comuna auditada
-- **anno**: Año del informe de auditoría
-- **tipo_hallazgo**: Clasificación del hallazgo según tipo de irregularidad
-- **descripcion**: Descripción técnica del hallazgo observado
-- **monto_asociado**: Monto involucrado en CLP (puede ser 0 si no aplica)
-- **fuente_url**: URL del informe original en contraloria.cl
+- `sinimFetcher.js` - Data fetching module. Attempts to fetch from official SUBDERE endpoints and falls back to realistic generated data for all 345 communes.
+- `sinim.js` - Main scraper module. Orchestrates fetch -> validate -> transform pipeline.
 
-## Tipos de Hallazgos
-
-| Tipo | Descripción | Severidad Típica |
-|------|-------------|------------------|
-| `licitacion` | Irregularidades en procesos de contratación pública | Alta |
-| `rendicion_cuentas` | Problemas en documentación y rendición de fondos | Media |
-| `beneficios_sociales` | Otorgamiento indebido de beneficios sociales | Alta |
-| `obras_publicas` | Deficiencias en execution de obras públicas | Alta |
-| `inventario` | Irregularidades en control de bienes e inventario | Baja |
-
-## Uso
-
-### Como módulo Node.js
-
-```javascript
-import scrapeContraloria from './scrapers/contraloria.js';
-
-// Ejecutar scraping completo
-const hallazgos = await scrapeContraloria({
-  anno: 2023,
-  outputPath: './data/contraloria/hallazgos.csv'
-});
-
-// Obtener hallazgos de una comuna específica
-import { getHallazgosPorComuna } from './scrapers/contraloria.js';
-const hallazgosSantiago = await getHallazgosPorComuna('Santiago');
-
-// Filtrar por tipo
-import { getHallazgosPorTipo } from './scrapers/contraloria.js';
-const licitaciones = await getHallazgosPorTipo('licitacion');
-```
-
-### Como CLI
+## Usage
 
 ```bash
-node src/scrapers/contraloria.js
-node src/scrapers/contraloriaFetcher.js [output_path]
+# Run the full scraping pipeline
+node src/scrapers/sinim.js
+
+# Run the fetcher directly
+node src/scrapers/sinimFetcher.js
+
+# With custom output directory
+node src/scrapers/sinim.js --output /custom/path
 ```
 
-## Estructura de Archivos
+## Data Flow
 
-```
-backend/src/scrapers/
-├── contraloria.js          # Scraper principal
-├── contraloriaFetcher.js   # Lógica de fetching y generación de datos
-└── README.md              # Este archivo
+1. **Fetch**: Attempts to download CSV from SUBDERE SINIM endpoints. If endpoints return 404 (which they currently do), falls back to generating realistic mock data for all 345 communes.
+2. **Validate**: Validates CSV structure, checks required columns, validates data ranges, detects duplicates.
+3. **Transform**: Normalizes data to match the SQLite database schema and outputs to `comunas_345.csv` in the data directory.
 
-data/contraloria/
-└── hallazgos.csv          # Datos generados por el scraper
-```
+## Output
 
-## Notas técnicas
+- `data/sinim/comunas_345.csv` - Main CSV file with all 345 communes
+- `data/sinim/comunas_345_transformed.json` - Transformed JSON for database import
 
-- Los datos se generan de forma reproducible usando un seed determinístico
-- Aproximadamente el 40% de las comunas tienen hallazgos en un año dado
-- Los montos se generan con distribución log-uniforme para reflejar la realidad
-- Las descripciones son textos realistas basados en patrones reales de la CGR
+## Note on Data Sources
+
+When real SINIM data becomes available (endpoints currently return 404), the fetcher will use it. Until then, realistic mock data is generated based on:
+- Region characteristics (metropolitan/north/south)
+- Deterministic seeded random for reproducibility
+- Budget ranges based on population estimates
